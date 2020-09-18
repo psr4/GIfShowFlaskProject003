@@ -10,11 +10,9 @@ import re
 
 class WorkpageFunc:
     def __init__(self, url):
-        self.url = url
-        self.get_pageid()
+        self.share_url = url
         configs = config()
         self.headers = configs.HEADERS
-        print(type(self.headers))
         self.sig_data = configs.SIG_DATA
         self.salt = config().SALT
         self.token_salt = configs.TOKEN_SALT
@@ -24,41 +22,23 @@ class WorkpageFunc:
         url_headers = {}
         head = list(self.headers)
         sig_key = copy.deepcopy(self.headers)
-        print('----------')
-        print(sigdata)
         sig_key.update(sigdata)
-
         key = sorted(list(sig_key))
         for i in range(0, len(key)):
             if key[i] == 'exp_tag0':
-                print(i)
-                print(key[i])
                 key[i], key[i - 1] = key[i - 1], key[i]
         for i in key:
             sig_str = sig_str + i + "=" + sig_key[i]
         self.sig_str = sig_str
-        print(self.sig_str)
         head.sort()
         for i in head:
             url_headers[i] = self.headers[i]
         self.url_tail = parse.urlencode(url_headers)
 
-    def get_pageid(self):
-        url = self.url
-        pat = "photo\/(\d+)\?user"
-        exp_pat = "&et=(.*?)"
-        id = re.findall(pat,url)
-        exp =re.findall(exp_pat,url)
-        photoid = id[0]
-        userid = id[0][-9:]
-        print(userid)
-        print(exp)
-        exp_tag = exp[0].replace('%2F','/')
-        return str(photoid),str(userid),exp_tag
 
     def get_sig_data_like(self):
         data_sig = copy.deepcopy(self.sig_data)
-        photoid,userid,exp_tag = self.get_pageid()
+        userid, photoid, exp_tag = self.get_user_workpage_id()
         data = {
             'user_id': userid,
             'photo_id': photoid,
@@ -72,9 +52,44 @@ class WorkpageFunc:
         }
         data_sig.update(data)
         return data_sig
+    def get_sig_data_comment(self):
+        comment_content = 'hahahahhahahahahhahah'
+        data_sig = copy.deepcopy(self.sig_data)
+        userid,photoid,exp_tag = self.get_user_workpage_id()
+        data = {'photo_id': photoid,
+                'user_id': userid,
+                'referer': 'ks://photo/{}/{}/3/{}#addcomment'.format(userid,photoid,exp_tag),
+                'content': self.comment_content,
+                'reply_to': '',
+                'replyToCommentId': '',
+                'copy': '0',
+                'praiseCommentId': '0',
+                }
+        data_sig.update(data)
+        return data_sig
+
+
+
+
 
     def get_sig_data_follow(self):
         data_sig = copy.deepcopy(self.sig_data)
+        userid,photoid,exp_tag = self.get_user_workpage_id()
+        data = {
+            'touid': userid,
+            'ftype': '1',
+            'act_ref': userid+'_'+photoid+'_p6',
+            'page_ref': '16',
+            'referer': 'ks://photo/{}/{}/3/1_i/{}#follow'.format(userid,photoid,exp_tag),
+            'exp_tag0': '_',
+            'exp_tag': exp_tag,
+            'expTagList': 'CksKRmZlZWRfcGhvdG98NTE5MjkzMTg4MzI5MDIxNDI2OXwyMDUxNjU4MjI3fDFfaS8yMDAwMTI4MjI1ODkyOTE3OTM4X2YxMDISATE=',
+            'photoinfo': '_/_',
+            'followSource': '0',
+        }
+        data_sig.update(data)
+        return data_sig
+
     def getNsTokenSig(self, sig):
         str3 = sig + self.token_salt
         cc = bytearray(str3.encode())
@@ -95,14 +110,10 @@ class WorkpageFunc:
 
 
 
-    def Workpagelike(self):
-        like_url = 'https://apis2.ksapisrv.com/rest/photo/like?'
-        data = self.get_final_data(self.get_sig_data_like())
-        result = requests.post(url=like_url+self.url_tail,data=data)
-        return result.text
 
-    def get_userid(self):
-        sh_url = '一只爱粘人的猫😹😹😹 https://v.kuaishou.com/59WkPb 复制此消息，打开【快手】直接观看！'
+
+    def get_user_workpage_id(self):
+        sh_url = self.share_url
         pat = " https:\/\/v.kuaishou.com\/(.*?) "
         res = re.findall(pat, sh_url)
         url = "https://v.kuaishou.com/" + res[0]
@@ -110,8 +121,21 @@ class WorkpageFunc:
         r = http.request("GET", url, redirect=False)
         str = r.headers["Location"]
         pat1 = '&userId=(.*?)&'
-        web_userid = re.findall(pat1, str)
-        print(web_userid[0])
+        pat2 = 'hareObjectId=(.*?)&'
+        exp_pat = "&et=(.*?)&"
+        exp = re.findall(exp_pat, str)
+        exp_tag = exp[0].replace('%2F', '/')
+        print(exp_tag)
+        workpage_id = ''
+        web_userid = ''
+        try:
+            workpage_id = re.findall(pat2,str)
+            print(workpage_id[0])
+
+            web_userid = re.findall(pat1, str)
+            print(web_userid[0])
+        except:
+            print('复制的链接没有找到作品或者作者ID')
 
         user_url = "https://live.kuaishou.com/m_graphql"
 
@@ -127,18 +151,38 @@ class WorkpageFunc:
         cc = requests.post(url=user_url, headers=headers, json=data)
         jn = cc.json()
         user_id = jn["data"]["sensitiveUserInfo"]["originUserId"]
-        print(user_id)
+        print(user_id,workpage_id[0],exp_tag)
+        return user_id,workpage_id[0],exp_tag
+
+    def Workpagelike(self):
+        like_url = 'https://apis2.ksapisrv.com/rest/photo/like?'
+        data = self.get_final_data(self.get_sig_data_like())
+        result = requests.post(url=like_url+self.url_tail,data=data)
+        print(result.text)
+        return result.text
+
     def Workpagefollow(self):
-        user_id = self.get_userid()
+        data = self.get_final_data(self.get_sig_data_follow())
         follow_url = 'https://apis2.gifshow.com/rest/n/relation/follow?'
+        result = requests.post(url = follow_url+self.url_tail,data=data)
+        print(result.text)
+        return result.text
+    def Workpagecomment(self,comment):
+        self.comment_content = comment
+        comment_url = 'https://api3.ksapisrv.com/rest/photo/comment/add?'
+        data = self.get_final_data(self.get_sig_data_comment())
+        result = requests.post(url = comment_url+self.url_tail,data=data)
+        print(result.text)
+        return result.text
+
+
 
 
 
 if __name__ == "__main__":
-    workpage_url = "https://o.m.chenzhongtech.com/fw/photo/5195183683517735768?userId=3x5765u6u7kar9i&photoId=3xr6y62gbjvsvy2&cc=share_copylink&timestamp=1600244020292&et=1_i%2F2000108968253389745_f0&fid=1942009504"
-    WF = WorkpageFunc(workpage_url)
-
-    WF.get_userid()
-
-
-    #WF.Workpagelike()
+    share_url = "这是一只聪明的猫猫 https://v.kuaishou.com/899TWH 复制此消息，打开【快手】直接观看！"
+    WF = WorkpageFunc(share_url)
+    #WF.Workpagefollow()
+    comment_con = "ahhahahahahhah"
+    WF.Workpagecomment(comment_con)
+    WF.Workpagelike()

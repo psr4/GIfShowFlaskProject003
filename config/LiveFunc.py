@@ -139,9 +139,9 @@ class LiveFunc:
         result = requests.post(url=livelike_url + self.url_tail, data=data)
         print(result.text)
 
-    def livecomment(self):
+    def livecomment(self,content):
         livecomment_url = "https://api3.gifshow.com/rest/n/live/comment?"
-        data = self.get_final_data(self.get_sig_data_commentlive("haohaoahaohao"))
+        data = self.get_final_data(self.get_sig_data_commentlive(content))
         print("评论data======")
         print(data)
         result = requests.post(url=livecomment_url + self.url_tail, data=data)
@@ -151,8 +151,9 @@ if __name__ == "__mian__":
     gifshow = LiveFunc("https://v.kuaishou.com/95E8PD")
 
     #gifshow.startplay()
+    content  = "jajajajjajajja"
 
-    gifshow.livecomment()
+    gifshow.livecomment(content)
 
     # for i in range(1001):
     #     gifshow.livelike()
